@@ -31,14 +31,15 @@ func main() {
         clients[conn] = true
         clientsMtx.Unlock()
 
+        fmt.Println("New client: " + conn.RemoteAddr().String())
         go handleClient(conn)
     }
 }
 
 func handleClient(conn net.Conn) {
     defer conn.Close()
-		ip := conn.RemoteAddr().String()
-		conn.Write([]byte("Welcome " + ip + "!\n"))
+    ip := conn.RemoteAddr().String()
+    conn.Write([]byte("Welcome " + ip + "!\n"))
     reader := bufio.NewReader(conn)
     for {
         message, err := reader.ReadString('\n')
