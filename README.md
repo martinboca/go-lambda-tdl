@@ -1,7 +1,7 @@
 # go-lambda-tdl
 
-Run it locally:
+Build and run:
 ```
-go run server/main.go
-go run client/main.go
+make run_server
+make run_client
 ```
