@@ -37,12 +37,16 @@ func main() {
 		if ev.Type == termbox.EventKey {
 			if ev.Key == termbox.KeyArrowUp {
 				// Enviar acción de flecha hacia arriba al servidor
-				conn.Write([]byte("CLIENT_ACTION:ARROW_UP\n"))
+				conn.Write([]byte(buildPlayerAction(ActionMoveUp)))
+				continue
+			}
+			if ev.Key == termbox.KeyArrowDown {
+				conn.Write([]byte(buildPlayerAction(ActionMoveDown)))
+				continue
 			}
 			if ev.Key == termbox.KeyEsc {
 				return
 			}
-
 		}
 	}
 }
@@ -52,11 +56,11 @@ func handleServer(conn net.Conn) {
 	reader := bufio.NewReader(conn)
 	for {
 		message, err := reader.ReadString('\n')
+		message = strings.TrimSpace(message)
 		if err != nil {
 			// Manejar error
 			break
 		}
-
 		if strings.HasPrefix(message, GameUpdateHeader) {
 			handleGameUpdate(message)
 			continue
@@ -77,4 +81,8 @@ func handleGameUpdate(message string) {
 		scorePlayer2, _ := strconv.Atoi(gameUpdate[5])
 		DrawPongInterface(player1Pos, player2Pos, ballX, ballY, scorePlayer1, scorePlayer2)
 	}
+}
+
+func buildPlayerAction(action string) string {
+	return PlayerActionHeader + EndOfHeader + action + EndOfMessage
 }

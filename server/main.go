@@ -43,17 +43,16 @@ func main() {
 }
 
 func handleNewClient(conn net.Conn) {
-	defer conn.Close()
-	matchesMtx.Lock()
 	defer matchesMtx.Unlock()
+	matchesMtx.Lock()
 
 	// Buscar una partida con un solo jugador
-	for _, match := range activeMatches {
-		if !match.started {
+	for _, serverMatch := range activeMatches {
+		if !serverMatch.started {
 			// Agregar a este cliente a la partida existente y comenzar el juego
-			match.player2 = conn
-			match.started = true
-			go handleMatch(match)
+			serverMatch.player2 = conn
+			serverMatch.started = true
+			go handleMatch(serverMatch)
 			return
 		}
 	}
@@ -68,6 +67,7 @@ func handleNewClient(conn net.Conn) {
 }
 
 func handleMatch(serverMatch *ServerMatch) {
+	fmt.Println("MATCH STARTED")
 	defer func() {
 		matchesMtx.Lock()
 		delete(activeMatches, serverMatch.player1)
@@ -75,53 +75,67 @@ func handleMatch(serverMatch *ServerMatch) {
 		matchesMtx.Unlock()
 	}()
 
-	serverMatch.match.StartMatch()
-	match := serverMatch.match
 	player1Conn := serverMatch.player1
 	player2Conn := serverMatch.player2
-
-	// Enviar actualizaciones a los jugadores
-
-	// Handle player player actions
-	go handlePlayer(player1Conn, 1, &match)
-	go handlePlayer(player2Conn, 2, &match)
-
-	go handleGameUpdates(&match, serverMatch)
+	// Start game and handle updates
+	serverMatch.match.StartMatch()
+	go handlePlayer(player1Conn, 1, serverMatch)
+	go handlePlayer(player2Conn, 2, serverMatch)
+	go handleGameUpdates(serverMatch)
 }
 
 // Handles player messages
-func handlePlayer(playerConn net.Conn, playerNumber int, match *Match) {
+func handlePlayer(playerConn net.Conn, playerNumber int, serverMatch *ServerMatch) {
+	defer playerConn.Close()
 	reader := bufio.NewReader(playerConn)
 	for {
 		message, err := reader.ReadString('\n')
+		message = strings.TrimSpace(message)
 		if err != nil {
 			// Manejar error
 			break
 		}
 		if strings.HasPrefix(message, PlayerActionHeader) {
-			handlePlayerAction(message, playerNumber, match)
+			handlePlayerAction(message, playerNumber, serverMatch)
 			continue
 		}
 	}
 }
 
 // Update game state based on player actions
-func handlePlayerAction(message string, playerNumber int, match *Match) {
+func handlePlayerAction(message string, playerNumber int, serverMatch *ServerMatch) {
 	// Ejemplo: CLIENT_ACTION:MOVE_UP\n
 	parts := strings.Split(message, ":")
 	action := parts[1]
+
 	if action == ActionMoveUp {
-		match.MovePlayerUp(playerNumber)
+		serverMatch.match.MovePlayerUp(playerNumber)
 	} else if action == ActionMoveDown {
-		match.MovePlayerDown(playerNumber)
+		serverMatch.match.MovePlayerDown(playerNumber)
 	}
+	sendGameUpdate(serverMatch)
 }
 
 // Send game updates to players
-func handleGameUpdates(match *Match, serverMatch *ServerMatch) {
+func handleGameUpdates(serverMatch *ServerMatch) {
+	// Send game updated every 10 ms
+	go func() {
+		for {
+			sendGameUpdate(serverMatch)
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+
+	// Update game state every 1 second
 	for {
-		serverMatch.player1.Write([]byte(GameUpdateHeader + ":" + match.ToString() + "\n"))
-		serverMatch.player2.Write([]byte(GameUpdateHeader + ":" + match.ToString() + "\n"))
-		time.Sleep(100 * time.Millisecond)
+		waitTime := serverMatch.match.GetNextFrameWaitTime()
+		time.Sleep(time.Duration(waitTime) * time.Millisecond)
+		serverMatch.match.NextFrame()
 	}
+}
+
+func sendGameUpdate(serverMatch *ServerMatch) {
+	match_string := serverMatch.match.ToString()
+	serverMatch.player1.Write([]byte(GameUpdateHeader + ":" + match_string + "\n"))
+	serverMatch.player2.Write([]byte(GameUpdateHeader + ":" + match_string + "\n"))
 }

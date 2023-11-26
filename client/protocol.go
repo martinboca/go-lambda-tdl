@@ -23,8 +23,8 @@ CLIENT_ACTION:
 
 // Special characters
 const (
-	EndOfHeader  = ':'
-	EndOfMessage = '\n'
+	EndOfHeader  = ":"
+	EndOfMessage = "\n"
 )
 
 // Client headers

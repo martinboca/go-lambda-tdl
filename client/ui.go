@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	width, height = 200, 100
+	width, height = 90, 30
 	playerPadSize = 4
 )
 
