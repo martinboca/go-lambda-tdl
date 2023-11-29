@@ -29,7 +29,8 @@ const (
 
 // Client headers
 const (
-	PlayerActionHeader = "CLIENT_ACTION"
+	PlayerActionHeader     = "CLIENT_ACTION"
+	ClientConnectionHeader = "CLIENT_CONNECTION"
 )
 
 // Server headers

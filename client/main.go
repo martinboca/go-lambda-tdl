@@ -2,25 +2,36 @@ package main
 
 import (
 	"bufio"
+	"fmt"
+	"github.com/nsf/termbox-go"
 	"net"
+	"os"
 	"strconv"
 	"strings"
-
-	"github.com/nsf/termbox-go"
+	"time"
 )
 
 func main() {
+	var conn net.Conn
 	err := termbox.Init()
 	if err != nil {
 		panic(err)
 	}
 	defer termbox.Close()
 
-	conn, err := net.Dial("tcp", "localhost:8080")
-	if err != nil {
-		panic(err)
+	for { //Loop until connected
+		conn, err = net.Dial("tcp", "localhost:8080")
+		if err != nil {
+			fmt.Println(err, " | Connection failed, retrying...")
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		break // Successful connection
 	}
 	defer conn.Close()
+
+	name := identifyClient(conn)
+	fmt.Println("Hello: ", name)
 
 	eventQueue := make(chan termbox.Event)
 	go func() {
@@ -51,6 +62,25 @@ func main() {
 	}
 }
 
+func lineBreakRune() byte {
+	if os.PathSeparator == '\\' {
+		return '\r'
+	} else {
+		return '\n'
+	}
+}
+
+func identifyClient(conn net.Conn) string {
+	fmt.Println("Enter your ID/name:")
+	reader := bufio.NewReader(os.Stdin)
+	name, err := reader.ReadString(lineBreakRune())
+	if err != nil || len(name) == 0 {
+		name = "GUEST"
+	}
+	conn.Write([]byte(ClientConnectionHeader + EndOfHeader + name + EndOfMessage))
+	return name
+}
+
 func handleServer(conn net.Conn) {
 	defer conn.Close()
 	reader := bufio.NewReader(conn)
@@ -58,7 +88,7 @@ func handleServer(conn net.Conn) {
 		message, err := reader.ReadString('\n')
 		message = strings.TrimSpace(message)
 		if err != nil {
-			// Manejar error
+			fmt.Println("Connection error: ", err)
 			break
 		}
 		if strings.HasPrefix(message, GameUpdateHeader) {
