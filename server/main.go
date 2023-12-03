@@ -10,16 +10,24 @@ import (
 	"time"
 )
 
+type Player struct {
+	name string
+	conn net.Conn
+}
+
 type ServerMatch struct {
-	player1 net.Conn
-	player2 net.Conn
+	player1 Player
+	player2 Player
 	match   Match
 	started bool
+	paused  bool
 }
 
 var (
-	activeMatches = make(map[net.Conn]*ServerMatch)
-	matchesMtx    sync.Mutex
+	activeMatches  = make(map[int]*ServerMatch)
+	connectedUsers = make(map[string]bool)
+	matchIndex     = 0
+	matchesMtx     sync.Mutex
 )
 
 func main() {
@@ -42,62 +50,125 @@ func main() {
 	}
 }
 
+func identifyClient(conn net.Conn) (string, error) {
+	reader := bufio.NewReader(conn)
+	message, err := reader.ReadString('\n')
+	message = strings.TrimSpace(message)
+	if err != nil {
+		fmt.Println("Connection error: ", err)
+		conn.Close()
+		return "", err
+	}
+	//validar header?
+	parts := strings.Split(message, ":")
+	name := parts[1]
+	return name, nil
+}
+
 func handleNewClient(conn net.Conn) {
 	defer matchesMtx.Unlock()
 	matchesMtx.Lock()
 
+	name, err := identifyClient(conn)
+	if err != nil {
+		fmt.Println("Connection error identifying client: ", err)
+		return
+	}
+	if _, ok := connectedUsers[name]; ok {
+		fmt.Println("User", name, "already connected")
+		//TODO avisar al cliente que ya esta conectado y cerrarle la conexion
+		conn.Close()
+		return
+	} else {
+		fmt.Println("User", name, "connected")
+		connectedUsers[name] = true
+	}
+
+	//Buscar si el jugador ya esta en una partida
+	for match_id, serverMatch := range activeMatches {
+		fmt.Println("checking", match_id)
+		if serverMatch.player1.name == name && serverMatch.paused {
+			serverMatch.player1 = Player{conn: conn, name: name}
+			serverMatch.paused = false
+			fmt.Println("Player", name, "reconnected to the match", match_id)
+			go handlePlayer(conn, 1, name, serverMatch)
+			return
+		}
+		if serverMatch.player2.name == name && serverMatch.paused {
+			serverMatch.player2 = Player{conn: conn, name: name}
+			serverMatch.paused = false
+			fmt.Println("Player", name, "reconnected to the match", match_id)
+			go handlePlayer(conn, 2, name, serverMatch)
+			return
+		}
+		fmt.Println("Player", name, "was not in a match")
+		//sale del for si no esta en una partida
+	}
+
 	// Buscar una partida con un solo jugador
-	for _, serverMatch := range activeMatches {
+	for match_id, serverMatch := range activeMatches {
 		if !serverMatch.started {
 			// Agregar a este cliente a la partida existente y comenzar el juego
-			serverMatch.player2 = conn
+			serverMatch.player2 = Player{conn: conn, name: name}
 			serverMatch.started = true
-			go handleMatch(serverMatch)
+			go handleMatch(serverMatch, match_id)
 			return
 		}
 	}
 
 	// Si no hay partidas disponibles, crear una nueva
 	newMatch := &ServerMatch{
-		player1: conn,
+		player1: Player{conn: conn, name: name},
 		started: false,
+		paused:  false,
 	}
-	activeMatches[conn] = newMatch
+	activeMatches[matchIndex] = newMatch
+	matchIndex++
 
 }
 
-func handleMatch(serverMatch *ServerMatch) {
+func handleMatch(serverMatch *ServerMatch, match_id int) {
 	fmt.Println("MATCH STARTED")
-	defer func() {
-		matchesMtx.Lock()
-		delete(activeMatches, serverMatch.player1)
-		delete(activeMatches, serverMatch.player2)
-		matchesMtx.Unlock()
-	}()
+	//defer func() {
+	//	matchesMtx.Lock()
+	//	delete(activeMatches, match_id)
+	//	matchesMtx.Unlock()
+	//	fmt.Println("MATCH ENDED")
+	//}() NO CREO QUE ESTE BIEN TERMINAR EL PARTIDO ACA, PORQUE SE HACEN LOS HANDLERS Y AL TOQUE SE BORRA EL ACTIVE MATCH...
 
-	player1Conn := serverMatch.player1
-	player2Conn := serverMatch.player2
+	player1Conn := serverMatch.player1.conn
+	player2Conn := serverMatch.player2.conn
 	// Start game and handle updates
 	serverMatch.match.StartMatch()
-	go handlePlayer(player1Conn, 1, serverMatch)
-	go handlePlayer(player2Conn, 2, serverMatch)
+	go handlePlayer(player1Conn, 1, serverMatch.player1.name, serverMatch)
+	go handlePlayer(player2Conn, 2, serverMatch.player2.name, serverMatch)
 	go handleGameUpdates(serverMatch)
 }
 
 // Handles player messages
-func handlePlayer(playerConn net.Conn, playerNumber int, serverMatch *ServerMatch) {
-	defer playerConn.Close()
+func handlePlayer(playerConn net.Conn, playerNumber int, name string, serverMatch *ServerMatch) {
+	fmt.Println("MATCH STARTED")
+	defer func() {
+		playerConn.Close()
+		serverMatch.paused = true
+		matchesMtx.Lock()
+		delete(connectedUsers, name)
+		matchesMtx.Unlock()
+	}()
 	reader := bufio.NewReader(playerConn)
 	for {
 		message, err := reader.ReadString('\n')
 		message = strings.TrimSpace(message)
 		if err != nil {
-			// Manejar error
+			fmt.Println("Player", playerNumber, "connection error: ", err)
 			break
 		}
-		if strings.HasPrefix(message, PlayerActionHeader) {
-			handlePlayerAction(message, playerNumber, serverMatch)
-			continue
+		if serverMatch.started && !serverMatch.paused {
+			//actions
+			if strings.HasPrefix(message, PlayerActionHeader) {
+				handlePlayerAction(message, playerNumber, serverMatch)
+				continue
+			}
 		}
 	}
 }
@@ -113,7 +184,7 @@ func handlePlayerAction(message string, playerNumber int, serverMatch *ServerMat
 	} else if action == ActionMoveDown {
 		serverMatch.match.MovePlayerDown(playerNumber)
 	}
-	sendGameUpdate(serverMatch)
+	// sendGameUpdate(serverMatch) esto MEPA que esta de mas
 }
 
 // Send game updates to players
@@ -121,21 +192,25 @@ func handleGameUpdates(serverMatch *ServerMatch) {
 	// Send game updated every 10 ms
 	go func() {
 		for {
-			sendGameUpdate(serverMatch)
-			time.Sleep(10 * time.Millisecond)
+			if serverMatch.started && !serverMatch.paused {
+				sendGameUpdate(serverMatch)
+				time.Sleep(10 * time.Millisecond)
+			}
 		}
 	}()
 
 	// Update game state every 1 second
 	for {
-		waitTime := serverMatch.match.GetNextFrameWaitTime()
-		time.Sleep(time.Duration(waitTime) * time.Millisecond)
-		serverMatch.match.NextFrame()
+		if serverMatch.started && !serverMatch.paused {
+			waitTime := serverMatch.match.GetNextFrameWaitTime()
+			time.Sleep(time.Duration(waitTime) * time.Millisecond)
+			serverMatch.match.NextFrame()
+		}
 	}
 }
 
 func sendGameUpdate(serverMatch *ServerMatch) {
 	match_string := serverMatch.match.ToString()
-	serverMatch.player1.Write([]byte(GameUpdateHeader + ":" + match_string + "\n"))
-	serverMatch.player2.Write([]byte(GameUpdateHeader + ":" + match_string + "\n"))
+	serverMatch.player1.conn.Write([]byte(GameUpdateHeader + ":" + match_string + "\n"))
+	serverMatch.player2.conn.Write([]byte(GameUpdateHeader + ":" + match_string + "\n"))
 }
