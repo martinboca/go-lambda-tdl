@@ -6,6 +6,8 @@ import (
 	"github.com/nsf/termbox-go"
 	"net"
 	"os"
+	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -42,6 +44,19 @@ func main() {
 
 	// Goroutine para manejar los mensajes del servidor
 	go handleServer(conn)
+	clearScreen()
+	DrawWelcomeScreen()
+
+	// Esperar hasta que el otro cliente se conecte
+	_, err = conn.Read(make([]byte, 1))
+	if err != nil {
+		fmt.Println("Error waiting for another client connection:", err)
+		return
+	}
+
+	// Borrar el mensaje de espera
+	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+	termbox.Flush()
 
 	for {
 		ev := <-eventQueue
@@ -115,4 +130,19 @@ func handleGameUpdate(message string) {
 
 func buildPlayerAction(action string) string {
 	return PlayerActionHeader + EndOfHeader + action + EndOfMessage
+}
+
+func clearScreen() {
+	var cmd *exec.Cmd
+
+	// Verificar el sistema operativo y usar el comando correspondiente
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("cmd", "/c", "cls")
+	} else {
+		cmd = exec.Command("clear")
+	}
+
+	// Ejecutar el comando para limpiar la pantalla
+	cmd.Stdout = os.Stdout
+	cmd.Run()
 }
