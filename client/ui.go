@@ -11,7 +11,7 @@ const (
 	scoreTextLength = 5 // Longitud máxima del texto del puntaje (ejemplo: "99-99")
 )
 
-func DrawPongInterface(player1Pad, player2Pad, ballX, ballY, scorePlayer1 int, scorePlayer2 int) {
+func DrawPongInterface(player1Pad, player2Pad, ballX, ballY, scorePlayer1 int, scorePlayer2 int, explosion int) {
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 
 	// Draw horizontal borders
@@ -55,6 +55,10 @@ func DrawPongInterface(player1Pad, player2Pad, ballX, ballY, scorePlayer1 int, s
 	score2X := centerX + 1 // Center right align
 	DrawText(score2X, centerY, score2Text)
 
+	if explosion != 0 {
+		DrawExplosion(ballX, ballY, explosion)
+	}
+
 	termbox.Flush()
 }
 
@@ -64,9 +68,24 @@ func DrawText(x, y int, text string) {
 	}
 }
 
-func DrawWaitingScreen() {
-	DrawText(width/2-10, height/2, "Waiting for player...")
-	termbox.Flush()
+func DrawExplosion(x, y int, explosion int) {
+	offsets := [][]int{
+		{1, 0}, {0, 1}, {0, -1}, {3, 0}, {0, 2}, {1, -2},
+		{3, 0}, {2, 3}, {2, -3},
+	}
+
+	if explosion != 1 {
+		for i := range offsets {
+			offsets[i][0] *= -1
+		}
+	}
+
+	color := termbox.ColorYellow
+	defaultColor := termbox.ColorDefault
+
+	for _, offset := range offsets {
+		termbox.SetCell(x+offset[0], y+offset[1], '*', color, defaultColor)
+	}
 }
 
 func showMessage(x, y int, message string) {

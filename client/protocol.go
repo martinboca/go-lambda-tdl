@@ -40,6 +40,7 @@ const (
 
 // Client actions
 const (
-	ActionMoveUp   = "MOVE_UP"
-	ActionMoveDown = "MOVE_DOWN"
+	ActionMoveUp    = "MOVE_UP"
+	ActionMoveDown  = "MOVE_DOWN"
+	ActionExplosion = "EXPLOSION"
 )

@@ -183,6 +183,8 @@ func handlePlayerAction(message string, playerNumber int, serverMatch *ServerMat
 		serverMatch.match.MovePlayerUp(playerNumber)
 	} else if action == ActionMoveDown {
 		serverMatch.match.MovePlayerDown(playerNumber)
+	} else if action == ActionExplosion {
+		serverMatch.match.Explosion()
 	}
 	// sendGameUpdate(serverMatch) esto MEPA que esta de mas
 }
