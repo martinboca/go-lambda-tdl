@@ -64,7 +64,13 @@ func DrawText(x, y int, text string) {
 	}
 }
 
-func DrawWelcomeScreen() {
+func DrawWaitingScreen() {
 	DrawText(width/2-10, height/2, "Waiting for player...")
+	termbox.Flush()
+}
+
+func showMessage(x, y int, message string) {
+	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+	DrawText(x, y, message)
 	termbox.Flush()
 }

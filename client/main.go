@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"github.com/nsf/termbox-go"
 	"net"
-	"os"
-	"os/exec"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -32,8 +29,7 @@ func main() {
 	}
 	defer conn.Close()
 
-	name := identifyClient(conn)
-	fmt.Println("Hello: ", name)
+	identifyClient(conn)
 
 	eventQueue := make(chan termbox.Event)
 	go func() {
@@ -44,8 +40,7 @@ func main() {
 
 	// Goroutine para manejar los mensajes del servidor
 	go handleServer(conn)
-	clearScreen()
-	DrawWelcomeScreen()
+	showMessage(width/2-10, height/2, "Waiting for player...")
 
 	// Esperar hasta que el otro cliente se conecte
 	_, err = conn.Read(make([]byte, 1))
@@ -53,10 +48,6 @@ func main() {
 		fmt.Println("Error waiting for another client connection:", err)
 		return
 	}
-
-	// Borrar el mensaje de espera
-	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-	termbox.Flush()
 
 	for {
 		ev := <-eventQueue
@@ -75,25 +66,6 @@ func main() {
 			}
 		}
 	}
-}
-
-func lineBreakRune() byte {
-	if os.PathSeparator == '\\' {
-		return '\r'
-	} else {
-		return '\n'
-	}
-}
-
-func identifyClient(conn net.Conn) string {
-	fmt.Println("Enter your ID/name:")
-	reader := bufio.NewReader(os.Stdin)
-	name, err := reader.ReadString(lineBreakRune())
-	if err != nil || len(name) == 0 {
-		name = "GUEST"
-	}
-	conn.Write([]byte(ClientConnectionHeader + EndOfHeader + name + EndOfMessage))
-	return name
 }
 
 func handleServer(conn net.Conn) {
@@ -132,17 +104,39 @@ func buildPlayerAction(action string) string {
 	return PlayerActionHeader + EndOfHeader + action + EndOfMessage
 }
 
-func clearScreen() {
-	var cmd *exec.Cmd
+func identifyClient(conn net.Conn) string {
+	showMessage(1, 1, "Enter your ID/name:")
 
-	// Verificar el sistema operativo y usar el comando correspondiente
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("cmd", "/c", "cls")
-	} else {
-		cmd = exec.Command("clear")
+	name := readInput()
+
+	if len(name) == 0 {
+		name = "GUEST"
 	}
 
-	// Ejecutar el comando para limpiar la pantalla
-	cmd.Stdout = os.Stdout
-	cmd.Run()
+	conn.Write([]byte(ClientConnectionHeader + EndOfHeader + name + EndOfMessage))
+	return name
+}
+
+func readInput() string {
+	input := ""
+
+inputLoop:
+	for {
+		switch ev := termbox.PollEvent(); ev.Type {
+		case termbox.EventKey:
+			switch ev.Key {
+			case termbox.KeyEnter:
+				break inputLoop
+			case termbox.KeyBackspace, termbox.KeyBackspace2:
+				if len(input) > 0 {
+					input = input[:len(input)-1]
+				}
+			default:
+				input += string(ev.Ch)
+			}
+		}
+		showMessage(1, 1, "Enter your ID/name: "+input)
+	}
+
+	return strings.TrimSpace(input)
 }
