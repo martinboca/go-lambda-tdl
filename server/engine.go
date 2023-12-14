@@ -26,6 +26,7 @@ type Match struct {
 	scorePlayer1 int
 	scorePlayer2 int
 	speed        float32
+	explosion    int
 }
 
 func (m *Match) ToString() string {
@@ -34,7 +35,8 @@ func (m *Match) ToString() string {
 		fmt.Sprint(int(m.ballX)) + "," +
 		fmt.Sprint(int(m.ballY)) + "," +
 		fmt.Sprint(int(m.scorePlayer1)) + "," +
-		fmt.Sprint(int(m.scorePlayer2))
+		fmt.Sprint(int(m.scorePlayer2)) + "," +
+		fmt.Sprint(int(m.explosion))
 }
 
 func (m *Match) StartMatch() {
@@ -45,6 +47,7 @@ func (m *Match) StartMatch() {
 	m.ballDir.dx = randomHorizontalDirection()
 	m.ballDir.dy = randomVerticalDirection()
 	m.speed = initialSpeed
+	m.explosion = 0
 }
 
 func (m *Match) MovePlayerUp(player int) {
@@ -80,6 +83,10 @@ func (m *Match) GetNextFrameWaitTime() int {
 }
 
 func (m *Match) NextFrame() {
+	if m.explosion != 0 {
+		m.explosion = 0
+	}
+
 	// Ball collision with players
 	if m.ballX == 2 && m.ballY >= m.player1Pos && m.ballY < m.player1Pos+playerPadSize {
 		m.ballDir.dx = -m.ballDir.dx
@@ -135,4 +142,15 @@ func randomHorizontalDirection() int {
 // Random -1, 0 or 1
 func randomVerticalDirection() int {
 	return rand.Intn(3) - 1
+}
+
+func (m *Match) Explosion() {
+	if m.ballX <= 3 && m.ballY >= m.player1Pos && m.ballY < m.player1Pos+playerPadSize {
+		m.speed += speedIncrement * 100
+		m.explosion = 1
+	}
+	if m.ballX >= width-4 && m.ballY >= m.player2Pos && m.ballY < m.player2Pos+playerPadSize {
+		m.speed += speedIncrement * 100
+		m.explosion = 2
+	}
 }
