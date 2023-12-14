@@ -16,11 +16,12 @@ type Player struct {
 }
 
 type ServerMatch struct {
-	player1 Player
-	player2 Player
-	match   Match
-	started bool
-	paused  bool
+	player1   Player
+	player2   Player
+	match     Match
+	preparing bool
+	started   bool
+	paused    bool
 }
 
 var (
@@ -118,9 +119,10 @@ func handleNewClient(conn net.Conn) {
 
 	// Si no hay partidas disponibles, crear una nueva
 	newMatch := &ServerMatch{
-		player1: Player{conn: conn, name: name},
-		started: false,
-		paused:  false,
+		player1:   Player{conn: conn, name: name},
+		preparing: true,
+		started:   false,
+		paused:    false,
 	}
 	activeMatches[matchIndex] = newMatch
 	matchIndex++
@@ -212,6 +214,15 @@ func handleGameUpdates(serverMatch *ServerMatch) {
 }
 
 func sendGameUpdate(serverMatch *ServerMatch) {
+	if serverMatch.preparing {
+		serverMatch.player1.conn.Write([]byte(GameStartHeader + EndOfHeader + serverMatch.player2.name + EndOfMessage))
+		serverMatch.player2.conn.Write([]byte(GameStartHeader + EndOfHeader + serverMatch.player1.name + EndOfMessage))
+
+		serverMatch.preparing = false
+		time.Sleep(3 * time.Second)
+		return
+	}
+
 	if serverMatch.match.scorePlayer1 == targetScore || serverMatch.match.scorePlayer2 == targetScore {
 		winner := func() string {
 			if serverMatch.match.scorePlayer1 == targetScore {

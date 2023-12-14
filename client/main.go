@@ -82,7 +82,7 @@ func handleServer(conn net.Conn) {
 			fmt.Println("Connection error: ", err)
 			break
 		}
-		if strings.HasPrefix(message, GameUpdateHeader) || strings.HasPrefix(message, GameEndHeader) {
+		if strings.HasPrefix(message, GameUpdateHeader) || strings.HasPrefix(message, GameEndHeader) || strings.HasPrefix(message, GameStartHeader) {
 			handleGameUpdate(message)
 			continue
 		}
@@ -92,12 +92,16 @@ func handleServer(conn net.Conn) {
 func handleGameUpdate(message string) {
 	parts := strings.Split(message, ":")
 
+	// Ejemplo: GAME_START:opponent\n
+	if parts[0] == GameStartHeader && len(parts[1]) == 1 {
+		showMessage(width/2-10, height/2, fmt.Sprintf("Starting the match, your opponent is: %s!", parts[1]))
+		return
+	}
+
 	// Ejemplo: GAME_END:player1Name\n represents the winner
-	if parts[0] == GameEndHeader {
-		if len(parts[1]) == 1 {
-			showMessage(width/2-10, height/2, fmt.Sprintf("Juego Finalizado%v¡El ganador es: %s!", "\n", parts[1]))
-			return
-		}
+	if parts[0] == GameEndHeader && len(parts[1]) == 1 {
+		showMessage(width/2-10, height/2, fmt.Sprintf("End game%v¡The winner is: %s!", "\n", parts[1]))
+		return
 	}
 
 	// Ejemplo: GAME_UPDATE:player1Pos,player2Pos,ballX,ballY,scorePlayer1,scorePlayer2\n
