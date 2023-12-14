@@ -176,7 +176,7 @@ func handlePlayer(playerConn net.Conn, playerNumber int, name string, serverMatc
 // Update game state based on player actions
 func handlePlayerAction(message string, playerNumber int, serverMatch *ServerMatch) {
 	// Ejemplo: CLIENT_ACTION:MOVE_UP\n
-	parts := strings.Split(message, ":")
+	parts := strings.Split(message, EndOfHeader)
 	action := parts[1]
 
 	if action == ActionMoveUp {
@@ -212,7 +212,24 @@ func handleGameUpdates(serverMatch *ServerMatch) {
 }
 
 func sendGameUpdate(serverMatch *ServerMatch) {
+	if serverMatch.match.scorePlayer1 == targetScore || serverMatch.match.scorePlayer2 == targetScore {
+		winner := func() string {
+			if serverMatch.match.scorePlayer1 == targetScore {
+				return serverMatch.player1.name
+			}
+			return serverMatch.player2.name
+		}()
+
+		serverMatch.player1.conn.Write([]byte(GameEndHeader + EndOfHeader + winner + EndOfMessage))
+		serverMatch.player2.conn.Write([]byte(GameEndHeader + EndOfHeader + winner + EndOfMessage))
+
+		time.Sleep(2 * time.Second)
+		serverMatch.paused = true
+		return
+	}
+
 	match_string := serverMatch.match.ToString()
-	serverMatch.player1.conn.Write([]byte(GameUpdateHeader + ":" + match_string + "\n"))
-	serverMatch.player2.conn.Write([]byte(GameUpdateHeader + ":" + match_string + "\n"))
+
+	serverMatch.player1.conn.Write([]byte(GameUpdateHeader + EndOfHeader + match_string + EndOfMessage))
+	serverMatch.player2.conn.Write([]byte(GameUpdateHeader + EndOfHeader + match_string + EndOfMessage))
 }

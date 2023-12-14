@@ -36,6 +36,12 @@ const (
 // Server headers
 const (
 	GameUpdateHeader = "GAME_UPDATE"
+	GameStartHeader  = "GAME_START"
+	GameEndHeader    = "GAME_END"
+)
+
+const (
+	targetScore = 3
 )
 
 // Client actions
