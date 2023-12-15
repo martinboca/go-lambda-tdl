@@ -35,9 +35,10 @@ const (
 
 // Server headers
 const (
-	GameUpdateHeader = "GAME_UPDATE"
-	GameStartHeader  = "GAME_START"
-	GameEndHeader    = "GAME_END"
+	GameUpdateHeader         = "GAME_UPDATE"
+	GameStartHeader          = "GAME_START"
+	GameEndHeader            = "GAME_END"
+	PlayerDisconnectedHeader = "PLAYER_DISCONNECTED"
 )
 
 const (
