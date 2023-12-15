@@ -25,7 +25,7 @@ type ServerMatch struct {
 	paused    bool
 }
 
-func (s ServerMatch) disconnectPlayer(number int) {
+func (s *ServerMatch) disconnectPlayer(number int) {
 	if number == 1 {
 		s.player1.connected = false
 	} else {
@@ -33,7 +33,7 @@ func (s ServerMatch) disconnectPlayer(number int) {
 	}
 }
 
-func (s ServerMatch) playersConnected() bool {
+func (s *ServerMatch) allPlayersConnected() bool {
 	return s.player1.connected && s.player2.connected
 }
 
@@ -100,24 +100,33 @@ func handleNewClient(conn net.Conn) {
 
 	//Buscar si el jugador ya esta en una partida
 	for match_id, serverMatch := range activeMatches {
-		fmt.Println("checking", match_id)
-		if serverMatch.player1.name == name && serverMatch.paused {
-			serverMatch.player1 = Player{conn: conn, name: name, connected: true}
-			serverMatch.paused = false
-			fmt.Println("Player", name, "reconnected to the match", match_id)
-			go handlePlayer(conn, 1, name, serverMatch)
-			return
+		if serverMatch.paused {
+			fmt.Println("checking paused match", match_id)
+			if serverMatch.player1.name == name && serverMatch.paused {
+				serverMatch.player1.conn = conn
+				serverMatch.player1.connected = true
+				if serverMatch.allPlayersConnected() {
+					serverMatch.paused = false
+					serverMatch.preparing = true
+				}
+				fmt.Println("Player", name, "reconnected to the match", match_id)
+				go handlePlayer(conn, 1, name, serverMatch)
+				return
+			}
+			if serverMatch.player2.name == name && serverMatch.paused {
+				serverMatch.player2.conn = conn
+				serverMatch.player2.connected = true
+				if serverMatch.allPlayersConnected() {
+					serverMatch.paused = false
+					serverMatch.preparing = true
+				}
+				fmt.Println("Player", name, "reconnected to the match", match_id)
+				go handlePlayer(conn, 2, name, serverMatch)
+				return
+			}
 		}
-		if serverMatch.player2.name == name && serverMatch.paused {
-			serverMatch.player2 = Player{conn: conn, name: name, connected: true}
-			serverMatch.paused = false
-			fmt.Println("Player", name, "reconnected to the match", match_id)
-			go handlePlayer(conn, 2, name, serverMatch)
-			return
-		}
-		fmt.Println("Player", name, "was not in a match")
-		//sale del for si no esta en una partida
 	}
+	fmt.Println("Player", name, "was not in a match")
 
 	// Buscar una partida con un solo jugador
 	for match_id, serverMatch := range activeMatches {
@@ -162,7 +171,7 @@ func handleMatch(serverMatch *ServerMatch, match_id int) {
 
 // Handles player messages
 func handlePlayer(playerConn net.Conn, playerNumber int, name string, serverMatch *ServerMatch) {
-	fmt.Println("MATCH STARTED")
+	fmt.Println("PLAYER", playerNumber, "HANDLER STARTED", name)
 	defer func() {
 		playerConn.Close()
 		serverMatch.disconnectPlayer(playerNumber)
@@ -170,6 +179,7 @@ func handlePlayer(playerConn net.Conn, playerNumber int, name string, serverMatc
 		matchesMtx.Lock()
 		delete(connectedUsers, name)
 		matchesMtx.Unlock()
+		fmt.Println("PLAYER", playerNumber, "HANDLER ENDED", name)
 	}()
 	reader := bufio.NewReader(playerConn)
 	for {
@@ -211,20 +221,19 @@ func handleGameUpdates(serverMatch *ServerMatch) {
 	go func() {
 		for {
 			if serverMatch.started && !serverMatch.paused {
-				if serverMatch.playersConnected() {
-					sendGameUpdate(serverMatch)
-					time.Sleep(10 * time.Millisecond)
-				} else {
-					sendDisconnectedMessage(serverMatch)
-					time.Sleep(1000 * time.Millisecond)
-				}
+				sendGameUpdate(serverMatch)
+				time.Sleep(10 * time.Millisecond)
+			}
+			if !serverMatch.allPlayersConnected() {
+				sendDisconnectedMessage(serverMatch)
+				time.Sleep(1 * time.Second)
 			}
 		}
 	}()
 
 	// Update game state every 1 second
 	for {
-		if serverMatch.started && !serverMatch.paused {
+		if serverMatch.started && !serverMatch.paused && !serverMatch.preparing {
 			waitTime := serverMatch.match.GetNextFrameWaitTime()
 			time.Sleep(time.Duration(waitTime) * time.Millisecond)
 			serverMatch.match.NextFrame()

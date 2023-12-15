@@ -104,8 +104,9 @@ func handleGameUpdate(message string) {
 		return
 	}
 
-	if parts[0] == PlayerDisconnectedHeader && len(parts[1]) == 1 {
-		showMessage(width/2-10, height/2, fmt.Sprintf("GAME PAUSED%v¡Player %s disconnected!%vWaiting to reconnect...", "\n", parts[1], "\n"))
+	// Ejemplo: PLAYER_DISCONNECTED:playerName\n
+	if parts[0] == PlayerDisconnectedHeader {
+		showMessage(width/2-10, height/2, fmt.Sprintf("GAME PAUSED ¡Player %s disconnected!%vWaiting to reconnect...", parts[1], "\n"))
 		return
 	}
 
