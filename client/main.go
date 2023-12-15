@@ -82,7 +82,7 @@ func handleServer(conn net.Conn) {
 			fmt.Println("Connection error: ", err)
 			break
 		}
-		if strings.HasPrefix(message, GameUpdateHeader) || strings.HasPrefix(message, GameEndHeader) || strings.HasPrefix(message, GameStartHeader) {
+		if strings.HasPrefix(message, GameUpdateHeader) || strings.HasPrefix(message, GameEndHeader) || strings.HasPrefix(message, GameStartHeader) || strings.HasPrefix(message, PlayerDisconnectedHeader) {
 			handleGameUpdate(message)
 			continue
 		}
@@ -101,6 +101,11 @@ func handleGameUpdate(message string) {
 	// Ejemplo: GAME_END:player1Name\n represents the winner
 	if parts[0] == GameEndHeader && len(parts[1]) == 1 {
 		showMessage(width/2-10, height/2, fmt.Sprintf("End game%v¡The winner is: %s!", "\n", parts[1]))
+		return
+	}
+
+	if parts[0] == PlayerDisconnectedHeader && len(parts[1]) == 1 {
+		showMessage(width/2-10, height/2, fmt.Sprintf("GAME PAUSED%v¡Player %s disconnected!%vWaiting to reconnect...", "\n", parts[1], "\n"))
 		return
 	}
 
