@@ -255,8 +255,8 @@ func sendGameUpdate(serverMatch *ServerMatch) {
 		serverMatch.player1.conn.Write([]byte(GameStartHeader + EndOfHeader + serverMatch.player2.name + EndOfMessage))
 		serverMatch.player2.conn.Write([]byte(GameStartHeader + EndOfHeader + serverMatch.player1.name + EndOfMessage))
 
-		serverMatch.preparing = false
 		time.Sleep(3 * time.Second)
+		serverMatch.preparing = false
 		return
 	}
 
