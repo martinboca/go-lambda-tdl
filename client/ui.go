@@ -1,14 +1,13 @@
 package main
 
 import (
-	termbox "github.com/nsf/termbox-go"
+	"github.com/nsf/termbox-go"
 	"strconv"
 )
 
 const (
-	width, height   = 90, 30
-	playerPadSize   = 4
-	scoreTextLength = 5 // Longitud máxima del texto del puntaje (ejemplo: "99-99")
+	width, height = 90, 30
+	playerPadSize = 4
 )
 
 func DrawPongInterface(player1Pad, player2Pad, ballX, ballY, scorePlayer1 int, scorePlayer2 int, explosion int) {

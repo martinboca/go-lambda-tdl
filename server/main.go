@@ -129,12 +129,12 @@ func handleNewClient(conn net.Conn) {
 	fmt.Println("Player", name, "was not in a match")
 
 	// Buscar una partida con un solo jugador
-	for match_id, serverMatch := range activeMatches {
+	for _, serverMatch := range activeMatches {
 		if !serverMatch.started {
 			// Agregar a este cliente a la partida existente y comenzar el juego
 			serverMatch.player2 = Player{conn: conn, name: name, connected: true}
 			serverMatch.started = true
-			go handleMatch(serverMatch, match_id)
+			go handleMatch(serverMatch)
 			return
 		}
 	}
@@ -151,17 +151,11 @@ func handleNewClient(conn net.Conn) {
 
 }
 
-func handleMatch(serverMatch *ServerMatch, match_id int) {
+func handleMatch(serverMatch *ServerMatch) {
 	fmt.Println("MATCH STARTED")
-	//defer func() {
-	//	matchesMtx.Lock()
-	//	delete(activeMatches, match_id)
-	//	matchesMtx.Unlock()
-	//	fmt.Println("MATCH ENDED")
-	//}() NO CREO QUE ESTE BIEN TERMINAR EL PARTIDO ACA, PORQUE SE HACEN LOS HANDLERS Y AL TOQUE SE BORRA EL ACTIVE MATCH...
-
 	player1Conn := serverMatch.player1.conn
 	player2Conn := serverMatch.player2.conn
+
 	// Start game and handle updates
 	serverMatch.match.StartMatch()
 	go handlePlayer(player1Conn, 1, serverMatch.player1.name, serverMatch)
@@ -212,7 +206,6 @@ func handlePlayerAction(message string, playerNumber int, serverMatch *ServerMat
 	} else if action == ActionExplosion {
 		serverMatch.match.Explosion()
 	}
-	// sendGameUpdate(serverMatch) esto MEPA que esta de mas
 }
 
 // Send game updates to players
